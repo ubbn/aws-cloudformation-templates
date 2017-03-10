@@ -1,15 +1,15 @@
 {
   "AWSTemplateFormatVersion" : "2010-09-09",
 
-  "Description" : "To create VPC with two public subnets and two private subnets in different AZs NATs to enable instances in private subnets to access the internet and bastion hosts to moderate SSH access",
+  "Description" : "To create VPC with two public subnets and two private subnets in different AZs, NAT gateways to enable instances in private subnets to access the internet and bastion hosts to moderate SSH access",
 
   "Parameters" : {
     "KeyName" : {
-      "Description" : "Name of an existing EC2 KeyPair to allow SSH access to the bastion host",
-      "Type" : "AWS::EC2::KeyPair::KeyName",
+      "Description" : "Name of an existing EC2 KeyPair to enable SSH access to the bastion host",
+      "Type" : "AWS::EC2::KeyPair::KeyName"
     },
 
-    "InstanceType" : {
+    "BastionInstanceType" : {
       "Description" : "Bastion instance type",
       "Type" : "String",
       "Default" : "t1.micro",
@@ -52,7 +52,8 @@
         "CidrBlock" : "10.0.0.0/16",
         "Tags" : [
           {"Key" : "Application", "Value" : { "Ref" : "AWS::StackId"} },
-          {"Key" : "Network", "Value" : "Public" }
+          {"Key" : "Network", "Value" : "Public" },
+          {"Key" : "Name", "Value" : "CustomVPC" }
         ]
       }
     },
@@ -65,7 +66,8 @@
         "AvailabilityZone" : { "Fn::Select" : ["0", { "Fn::GetAZs" : { "Ref" : "AWS::Region" } }]},
         "Tags" : [
           {"Key" : "Application", "Value" : { "Ref" : "AWS::StackId"} },
-          {"Key" : "Network", "Value" : "Public" }
+          {"Key" : "Network", "Value" : "Public" },
+          {"Key" : "Name", "Value" : "Public01" }
         ]
       }
     },
@@ -78,7 +80,8 @@
         "AvailabilityZone" : { "Fn::Select" : ["1", { "Fn::GetAZs" : { "Ref" : "AWS::Region" } }]},
         "Tags" : [
           {"Key" : "Application", "Value" : { "Ref" : "AWS::StackId"} },
-          {"Key" : "Network", "Value" : "Public" }
+          {"Key" : "Network", "Value" : "Public" },
+          {"Key" : "Name", "Value" : "Public02" }
         ]
       }
     },
@@ -107,7 +110,8 @@
         "VpcId" : {"Ref" : "VPC"},
         "Tags" : [
           {"Key" : "Application", "Value" : { "Ref" : "AWS::StackId"} },
-          {"Key" : "Network", "Value" : "Public" }
+          {"Key" : "Network", "Value" : "Public" },
+          {"Key" : "Name", "Value" : "PublicRT" }
         ]
       }
     },
@@ -238,7 +242,8 @@
         "AvailabilityZone" : { "Fn::Select" : ["0", { "Fn::GetAZs" : { "Ref" : "AWS::Region" } }]},
         "Tags" : [
           {"Key" : "Application", "Value" : { "Ref" : "AWS::StackId"} },
-          {"Key" : "Network", "Value" : "Private" }
+          {"Key" : "Network", "Value" : "Private" },
+          {"Key" : "Name", "Value" : "Private01" }
         ]
       }
     },
@@ -251,7 +256,8 @@
         "AvailabilityZone" : { "Fn::Select" : ["1", { "Fn::GetAZs" : { "Ref" : "AWS::Region" } }]},
         "Tags" : [
           {"Key" : "Application", "Value" : { "Ref" : "AWS::StackId"} },
-          {"Key" : "Network", "Value" : "Private" }
+          {"Key" : "Network", "Value" : "Private" },
+          {"Key" : "Name", "Value" : "Private02" }
         ]
       }
     },
@@ -299,7 +305,7 @@
       "Properties" : {
         "RouteTableId" : { "Ref" : "PrivateRouteTable1" },
         "DestinationCidrBlock" : "0.0.0.0/0",
-        "InstanceId" : { "Ref" : "NATDevice1" }
+        "NatGatewayId" : { "Ref" : "NATGateway1" }
       }
     },
 
@@ -308,7 +314,7 @@
       "Properties" : {
         "RouteTableId" : { "Ref" : "PrivateRouteTable2" },
         "DestinationCidrBlock" : "0.0.0.0/0",
-        "InstanceId" : { "Ref" : "NATDevice2" }
+        "NatGatewayId" : { "Ref" : "NATGateway2" }
       }
     },
 
@@ -369,8 +375,7 @@
       "Type" : "AWS::EC2::EIP",
       "DependsOn" : "GatewayToInternet",
       "Properties" : {
-        "Domain" : "vpc",
-        "InstanceId" : { "Ref" : "NATDevice1" }
+        "Domain" : "vpc"
       }
     },
 
@@ -378,34 +383,39 @@
       "Type" : "AWS::EC2::EIP",
       "DependsOn" : "GatewayToInternet",
       "Properties" : {
-        "Domain" : "vpc",
-        "InstanceId" : { "Ref" : "NATDevice2" }
+        "Domain" : "vpc"
       }
     },
 
-    "NATDevice1" : {
-      "Type" : "AWS::EC2::Instance",
+    "NATGateway1" : {
+      "Type" : "AWS::EC2::NatGateway",
+      "DependsOn" : "GatewayToInternet",
       "Properties" : {
-        "InstanceType" : "t1.micro",
-        "KeyName" : { "Ref" : "KeyName" },
-        "SubnetId" : { "Ref" : "PublicSubnet1" },
-        "SourceDestCheck" : "false",
-        "ImageId" : { "Fn::FindInMap" : [ "AWSNATAMI", { "Ref" : "AWS::Region" }, "AMI" ]},
-        "SecurityGroupIds" : [{ "Ref" : "NATSecurityGroup" }],
-        "Tags" : [ {"Key" : "Name", "Value" : "NAT Device"} ]
+        "AllocationId" : {
+          "Fn::GetAtt" : [
+            "NATIPAddress1",
+            "AllocationId"
+          ]
+        },
+        "SubnetId" : {
+          "Ref" : "PublicSubnet1"
+        }
       }
     },
 
-    "NATDevice2" : {
-      "Type" : "AWS::EC2::Instance",
+    "NATGateway2" : {
+      "Type" : "AWS::EC2::NatGateway",
+      "DependsOn" : "GatewayToInternet",
       "Properties" : {
-        "InstanceType" : "t1.micro",
-        "KeyName" : { "Ref" : "KeyName" },
-        "SubnetId" : { "Ref" : "PublicSubnet2" },
-        "SourceDestCheck" : "false",
-        "ImageId" : { "Fn::FindInMap" : [ "AWSNATAMI", { "Ref" : "AWS::Region" }, "AMI" ]},
-        "SecurityGroupIds" : [{ "Ref" : "NATSecurityGroup" }],
-        "Tags" : [ {"Key" : "Name", "Value" : "NAT Device"} ]
+        "AllocationId" : {
+          "Fn::GetAtt" : [
+            "NATIPAddress2",
+            "AllocationId"
+          ]
+        },
+        "SubnetId" : {
+          "Ref" : "PublicSubnet2"
+        }
       }
     },
 
