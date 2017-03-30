@@ -1,0 +1,27 @@
+{
+  "AWSTemplateFormatVersion": "2010-09-09",
+  "Metadata": {
+    "License": "Apache-2.0"
+  },
+  "Description": "It creates publicly accessible S3 bucket which hosts static website. The bucket will be deleted when this stack is deleted. But keep in mind that all object
+s must be deleted first for deletion to succeed. User has to upload index error html files after the bucket is created",
+  "Resources": {
+    "S3Bucket": {
+      "Type": "AWS::S3::Bucket",
+      "Properties": {
+        "AccessControl": "PublicRead",
+        "WebsiteConfiguration": {
+          "IndexDocument": "index.html",
+          "ErrorDocument": "error.html"
+        }
+      },
+      "DeletionPolicy": "Delete"
+    }
+  },
+  "Outputs": {
+    "WebsiteURL": {
+      "Value": {"Fn::GetAtt":  ["S3Bucket", "WebsiteURL" ]},
+      "Description": "URL of static website hosted on S3 bucket"
+    }
+  }
+}
