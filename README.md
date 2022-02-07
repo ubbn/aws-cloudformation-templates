@@ -1,2 +1,2 @@
-# aws-cloudformation-templates
-CloudFormation templates for provisioning AWS resources 
+# About
+CloudFormation templates for provisioning most commonly used AWS resources 
